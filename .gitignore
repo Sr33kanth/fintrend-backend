@@ -4,3 +4,4 @@ site-packages/
 __pycache__/
 *.pyc
 .DS_Store
+.env

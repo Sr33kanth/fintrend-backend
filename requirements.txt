@@ -11,5 +11,8 @@ python-dotenv==1.0.0
 # Validation
 pydantic==2.6.0
 
+# Reddit API
+praw==7.7.1
+
 # Optional but recommended for production
 python-multipart==0.0.9

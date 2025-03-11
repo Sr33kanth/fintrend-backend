@@ -18,9 +18,9 @@ app = FastAPI(
 # Add CORS middleware to allow frontend to communicate with backend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
+    allow_origins=["http://localhost:3000", "https://localhost:3000"],  # Explicitly allow frontend origin
     allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # Explicitly list allowed methods
     allow_headers=["*"],  # Allows all headers
 )
 
@@ -77,15 +77,64 @@ async def remove_from_watchlist(stock: StockSymbol):
 
 # Routes for stock news
 @app.get("/news")
-def get_watchlist_news():
+def get_watchlist_news(include_reddit: bool = True, source: str = None):
     """
     Fetch news for all stocks in the watchlist
+    
+    Args:
+        include_reddit (bool, optional): Whether to include Reddit posts. Defaults to True.
+        source (str, optional): Filter news by source. Defaults to None.
     
     Returns:
         List of news articles for watchlist stocks
     """
     watchlist = watchlist_service.get_stocks()
-    return stock_news_service.get_stocks_news(watchlist)
+    return stock_news_service.get_stocks_news(watchlist, include_reddit=include_reddit, source=source)
+
+@app.get("/reddit/trending")
+def get_trending_reddit_posts(subreddits: str = None, limit: int = 10):
+    """
+    Fetch trending posts from Reddit
+    
+    Args:
+        subreddits (str, optional): Comma-separated list of subreddits. Defaults to None.
+        limit (int, optional): Maximum number of posts to return. Defaults to 10.
+    
+    Returns:
+        List of trending Reddit posts
+    """
+    subreddit_list = subreddits.split(",") if subreddits else None
+    return stock_news_service.get_trending_reddit_posts(subreddits=subreddit_list, limit=limit)
+
+@app.get("/reddit/breakouts")
+def get_breakout_reddit_posts(
+    subreddits: str = None, 
+    limit: int = 20, 
+    flairs: str = None, 
+    sentiment: str = None
+):
+    """
+    Fetch Reddit posts filtered by specific flairs and sentiment indicators
+    
+    Args:
+        subreddits (str, optional): Comma-separated list of subreddits. Defaults to None.
+        limit (int, optional): Maximum number of posts to return. Defaults to 20.
+        flairs (str, optional): Comma-separated list of flairs to filter for. Defaults to None.
+        sentiment (str, optional): Comma-separated list of sentiment phrases. Defaults to None.
+    
+    Returns:
+        List of filtered Reddit posts
+    """
+    subreddit_list = subreddits.split(",") if subreddits else None
+    flair_list = flairs.split(",") if flairs else None
+    sentiment_list = sentiment.split(",") if sentiment else None
+    
+    return stock_news_service.get_breakout_posts(
+        subreddits=subreddit_list, 
+        limit=limit,
+        target_flairs=flair_list,
+        sentiment_phrases=sentiment_list
+    )
 
 # For local development and testing
 if __name__ == "__main__":
