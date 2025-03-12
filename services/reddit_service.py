@@ -187,12 +187,11 @@ class RedditService:
                     )
                     
                     # Check if post contains sentiment phrases in title or body
-                    has_sentiment = False 
-                    # any(
-                    #     phrase.lower() in post.title.lower() or 
-                    #     (post.selftext and phrase.lower() in post.selftext.lower())
-                    #     for phrase in sentiment_phrases
-                    # )
+                    has_sentiment =  any(
+                        phrase.lower() in post.title.lower() or 
+                        (post.selftext and phrase.lower() in post.selftext.lower())
+                        for phrase in sentiment_phrases
+                    )
                     
                     # Add post if it matches our criteria
                     if has_target_flair or has_sentiment:
