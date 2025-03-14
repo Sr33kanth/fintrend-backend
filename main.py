@@ -7,6 +7,7 @@ import uvicorn
 # Import our custom modules (we'll create these next)
 from services.watchlist import WatchlistService
 from services.stock_news import StockNewsService
+from services.stock_analysis_service import StockAnalysisService
 
 # Create FastAPI app instance
 app = FastAPI(
@@ -31,6 +32,7 @@ class StockSymbol(BaseModel):
 # Dependency injection for services
 watchlist_service = WatchlistService()
 stock_news_service = StockNewsService()
+stock_analysis_service = StockAnalysisService()
 
 # Routes for watchlist management
 @app.post("/watchlist/add", response_model=List[str])
@@ -135,6 +137,40 @@ def get_breakout_reddit_posts(
         target_flairs=flair_list,
         sentiment_phrases=sentiment_list
     )
+
+@app.get("/stocks/breakout-suggestions")
+def get_breakout_suggestions(
+    subreddits: str = None,
+    limit: int = 20,
+    flairs: str = None,
+    sentiment: str = None
+):
+    """
+    Get potential breakout stock suggestions based on Reddit discussions
+    
+    Args:
+        subreddits (str, optional): Comma-separated list of subreddits. Defaults to None.
+        limit (int, optional): Maximum number of posts to analyze. Defaults to 20.
+        flairs (str, optional): Comma-separated list of flairs to filter for. Defaults to None.
+        sentiment (str, optional): Comma-separated list of sentiment phrases. Defaults to None.
+    
+    Returns:
+        Dict containing breakout stock suggestions and analysis
+    """
+    # Get filtered Reddit posts
+    subreddit_list = subreddits.split(",") if subreddits else None
+    flair_list = flairs.split(",") if flairs else None
+    sentiment_list = sentiment.split(",") if sentiment else None
+    
+    reddit_posts = stock_news_service.get_breakout_posts(
+        subreddits=subreddit_list,
+        limit=limit,
+        target_flairs=flair_list,
+        sentiment_phrases=sentiment_list
+    )
+    
+    # Analyze posts for breakout candidates
+    return stock_analysis_service.analyze_breakout_candidates(reddit_posts)
 
 # For local development and testing
 if __name__ == "__main__":

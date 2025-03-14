@@ -28,7 +28,7 @@ class RedditService:
         )
         
         # Default subreddits to monitor
-        self.default_subreddits = ['wallstreetbets']
+        self.default_subreddits = ['WallStreetbetsELITE']
     
     def _format_post(self, post, subreddit_name: str) -> dict:
         """
@@ -160,7 +160,7 @@ class RedditService:
         
         # Default target flairs if none provided
         if target_flairs is None:
-            target_flairs = ["DD", "Discussion", "YOLO", "Technical Analysis"]
+            target_flairs = ["DD", "YOLO", "Technical Analysis"]
             
         # Default sentiment phrases if none provided
         if sentiment_phrases is None:
