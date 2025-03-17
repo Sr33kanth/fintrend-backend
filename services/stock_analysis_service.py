@@ -1,7 +1,7 @@
 import os
 from typing import List, Dict, Optional
 from datetime import datetime
-import openai
+from openai import OpenAI
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -15,7 +15,7 @@ class StockAnalysisService:
         if not self.api_key:
             raise ValueError("OpenAI API key not found. Please set OPENAI_API_KEY in .env file")
         
-        openai.api_key = self.api_key
+        self.client = OpenAI(api_key=self.api_key)
         self.model = os.getenv("OPENAI_MODEL", "gpt-4-turbo-preview")
     
     def analyze_breakout_candidates(self, reddit_posts: List[Dict]) -> Dict:
@@ -30,7 +30,7 @@ class StockAnalysisService:
         """
         if not reddit_posts:
             return {
-                "breakout_candidates": [],
+                "analysis": '{"breakout_candidates": [], "analysis_summary": "No posts to analyze"}',
                 "analysis_timestamp": datetime.now().isoformat()
             }
         
@@ -83,32 +83,58 @@ Return the analysis in this JSON format:
     "analysis_summary": "Brief overall summary of findings"
 }}
 
-If no strong breakout candidates are found, return an empty list for breakout_candidates.
+If no strong breakout candidates are found, return an empty list for breakout_candidates but still provide an analysis_summary explaining why.
 """
         
         try:
-            # Call OpenAI API
-            response = openai.ChatCompletion.create(
+            # Call OpenAI API with new format
+            response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "You are a professional stock analyst skilled at identifying breakout opportunities from social media discussions."},
+                    {"role": "system", "content": "You are a professional stock analyst skilled at identifying breakout opportunities from social media discussions. Always return valid JSON."},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.1,  # Low temperature for more focused analysis
                 response_format={"type": "json_object"}
             )
             
-            # Extract and return the analysis
+            # Extract and validate the analysis
             analysis = response.choices[0].message.content
+            
+            # Ensure the response is properly formatted
+            try:
+                import json
+                parsed = json.loads(analysis)
+                if not isinstance(parsed, dict) or "breakout_candidates" not in parsed:
+                    raise ValueError("Invalid response format")
+                
+                # Add source URLs from original posts
+                for candidate in parsed.get("breakout_candidates", []):
+                    symbol = candidate["symbol"]
+                    candidate["source_urls"] = [
+                        post["url"] for post in reddit_posts 
+                        if symbol.lower() in post.get("headline", "").lower() or 
+                           symbol.lower() in post.get("summary", "").lower()
+                    ]
+                
+                # Re-serialize with source URLs
+                analysis = json.dumps(parsed)
+                
+            except json.JSONDecodeError:
+                return {
+                    "analysis": '{"breakout_candidates": [], "analysis_summary": "Error: Invalid analysis format"}',
+                    "analysis_timestamp": datetime.now().isoformat()
+                }
+            
             return {
                 "analysis": analysis,
                 "analysis_timestamp": datetime.now().isoformat()
             }
             
         except Exception as e:
+            print(f"Error in analyze_breakout_candidates: {str(e)}")  # Log the error
             return {
-                "error": f"Error analyzing posts: {str(e)}",
-                "breakout_candidates": [],
+                "analysis": '{"breakout_candidates": [], "analysis_summary": "Error analyzing posts"}',
                 "analysis_timestamp": datetime.now().isoformat()
             }
     
@@ -132,7 +158,7 @@ Text:
 """
         
         try:
-            response = openai.ChatCompletion.create(
+            response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": "You are a financial text analyzer that extracts stock symbols."},
