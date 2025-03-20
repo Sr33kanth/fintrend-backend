@@ -4,13 +4,14 @@ from typing import List, Dict
 import finnhub
 from dotenv import load_dotenv
 from services.reddit_service import RedditService
+from services.alpha_vantage_service import AlphaVantageService
 
 # Load environment variables
 load_dotenv()
 
 class StockNewsService:
     """
-    Service to fetch stock news from Finnhub API and Reddit
+    Service to fetch stock news from Finnhub API, Alpha Vantage, and Reddit
     """
     def __init__(self):
         # Get API key from environment variable
@@ -19,11 +20,10 @@ class StockNewsService:
         if not api_key:
             raise ValueError("Finnhub API key not found. Please set FINNHUB_API_KEY in .env file")
         
-        # Initialize Finnhub client
+        # Initialize clients
         self.finnhub_client = finnhub.Client(api_key=api_key)
-        
-        # Initialize Reddit service
         self.reddit_service = RedditService()
+        self.alpha_vantage_service = AlphaVantageService()
     
     def get_stocks_news(self, stocks: List[str], limit: int = 5, include_reddit: bool = True, source: str = None) -> Dict:
         """
@@ -48,18 +48,19 @@ class StockNewsService:
         # Normalize source parameter
         source_lower = source.lower() if source else None
         is_reddit_source = source_lower == "reddit" if source_lower else False
+        is_alpha_vantage_source = source_lower == "alpha_vantage" if source_lower else False
         
         for symbol in stocks:
             try:
                 formatted_news = []
                 
-                # Only fetch Finnhub news if not specifically filtering for Reddit
-                if not is_reddit_source:
+                # Fetch news from different sources based on filter
+                if not is_reddit_source and not is_alpha_vantage_source:
                     # Fetch company news from Finnhub
                     stock_news = self.finnhub_client.company_news(symbol, _from=from_date, to=to_date)
                     
-                    # Format news
-                    formatted_news = [
+                    # Format Finnhub news
+                    formatted_news.extend([
                         {
                             "headline": article.get("headline", "No Headline"),
                             "summary": article.get("summary", "No Summary"),
@@ -69,14 +70,15 @@ class StockNewsService:
                             "platform": "finnhub"
                         } 
                         for article in stock_news[:limit]
-                    ]
-                    
-                    # Filter by source if specified and not Reddit
-                    if source and not is_reddit_source:
-                        formatted_news = [
-                            article for article in formatted_news 
-                            if article["source"].lower() == source_lower
-                        ]
+                    ])
+                
+                if not is_reddit_source and (not source or is_alpha_vantage_source):
+                    try:
+                        # Fetch news from Alpha Vantage
+                        alpha_vantage_news = self.alpha_vantage_service.get_stock_news(symbol, limit=limit)
+                        formatted_news.extend(alpha_vantage_news)
+                    except Exception as e:
+                        print(f"Error fetching Alpha Vantage news: {e}")
                 
                 # Add Reddit posts if enabled or specifically requested
                 if include_reddit or is_reddit_source:
@@ -86,10 +88,17 @@ class StockNewsService:
                     except Exception as e:
                         print(f"Error fetching Reddit posts: {e}")
                 
+                # Filter by source if specified
+                if source and not is_reddit_source:
+                    formatted_news = [
+                        article for article in formatted_news 
+                        if article["platform"].lower() == source_lower
+                    ]
+                
                 # Sort by datetime (newest first)
                 formatted_news.sort(key=lambda x: x.get("datetime", ""), reverse=True)
                 
-                news_results[symbol] = formatted_news
+                news_results[symbol] = formatted_news[:limit]
             
             except Exception as e:
                 # Handle any errors in fetching news

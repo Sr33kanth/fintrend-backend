@@ -8,6 +8,7 @@ import uvicorn
 from services.watchlist import WatchlistService
 from services.stock_news import StockNewsService
 from services.stock_analysis_service import StockAnalysisService
+from routers import stock_data
 
 # Create FastAPI app instance
 app = FastAPI(
@@ -171,6 +172,9 @@ def get_breakout_suggestions(
     
     # Analyze posts for breakout candidates
     return stock_analysis_service.analyze_breakout_candidates(reddit_posts)
+
+# Include routers
+app.include_router(stock_data.router, prefix="/api", tags=["stock_data"])
 
 # For local development and testing
 if __name__ == "__main__":
