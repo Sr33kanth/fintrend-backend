@@ -92,4 +92,66 @@ class AlphaVantageService:
             
             return formatted_news
         except Exception as e:
-            raise Exception(f"Error fetching news for {symbol}: {str(e)}") 
+            raise Exception(f"Error fetching news for {symbol}: {str(e)}")
+    
+    def get_historical_data(self, symbol: str, period: str = "1m") -> Dict:
+        """
+        Get historical stock data for a given period
+        
+        Args:
+            symbol (str): Stock symbol
+            period (str): Time period (1d, 5d, 1m, 3m, 6m, 1y, etc.)
+            
+        Returns:
+            Dict: Historical price data formatted for charting
+        """
+        try:
+            # Map period to Alpha Vantage outputsize and function
+            if period in ["1d", "5d"]:
+                data, _ = self.time_series.get_intraday(symbol=symbol, interval='5min', outputsize='full')
+                # Filter to only include data for the requested period
+                if period == "1d":
+                    cutoff_date = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+                else:  # 5d
+                    cutoff_date = (datetime.now() - timedelta(days=5)).strftime('%Y-%m-%d')
+            else:
+                # For longer periods, use daily data
+                data, _ = self.time_series.get_daily(symbol=symbol, outputsize='full')
+                
+                # Filter based on period
+                if period == "1m":
+                    cutoff_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+                elif period == "3m":
+                    cutoff_date = (datetime.now() - timedelta(days=90)).strftime('%Y-%m-%d')
+                elif period == "6m":
+                    cutoff_date = (datetime.now() - timedelta(days=180)).strftime('%Y-%m-%d')
+                elif period == "1y":
+                    cutoff_date = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
+                else:
+                    cutoff_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')  # Default to 1m
+            
+            # Format data for charting
+            dates = []
+            prices = []
+            volumes = []
+            
+            for date, values in data.items():
+                if date >= cutoff_date:
+                    dates.append(date)
+                    prices.append(float(values['4. close']))
+                    volumes.append(int(values['5. volume']))
+            
+            # Reverse lists to show oldest to newest
+            dates.reverse()
+            prices.reverse()
+            volumes.reverse()
+            
+            return {
+                "symbol": symbol,
+                "period": period,
+                "dates": dates,
+                "prices": prices,
+                "volumes": volumes
+            }
+        except Exception as e:
+            raise Exception(f"Error fetching historical data for {symbol}: {str(e)}") 
